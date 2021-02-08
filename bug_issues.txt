@@ -1,0 +1,93 @@
+概要：
+ * 完整支持 Office 2007 DOCX, XLSX, PPTX格式的 password verification, encryption/decryption
+ * 完整支持XLSB格式， 同XLSX类似
+ * 支持 Agile 2010版本的password verification, encryption/decryption. 加密默认为Standard encryption.
+ * 支持 2010 &2013格式， 同Agile, 包含data integrity check
+ * 支持 Word(DOC), Excel(XLS), Slides(PPT) 格式的文件的password verification, 不支持文件加解密
+ * 对于较早文件格式，不支持 xor obfuscation or external encryptor algorithms
+
+
+
+============================================ Bug issues
+issue 1:
+NPOI只能处理 OLE2 office format, 而未加密的office 2007 file为ZIPPed XML格式。
+所以NPOI只能处理Office 2003及以前版本。
+现用file signature header判断2007格式。
+
+
+issue 2:
+NPOI也不能处理加密的office 2007文件 （encryption info version= v4.2)。虽然加密后
+为OLE格式，但stream不一样（含EncryptionInfo, EncryptedPackage两个流).
+
+
+issue 3: 对于docx扩展文件名，如何区分需要standard encryption or agile encryption?
+查office注册表信息？
+深入文件头？
+
+
+============================================ Progress
+
+d20130125
+也支持XLS(excel), PPT(slides) password verification
+
+d20130128
+完整支持XLSB格式， 同XLSX类似
+
+d20130130
+完整支持所有Office文件的 password verification (含Agile)
+支持office 2007 格式文件解密
+对于较早文件格式， 不支持 加解密， xor obfuscation or external encryptor
+
+
+d20130301
+支持 Office 2010,2013 (Agile) password verification, decryption.
+对于2013加密，暂时使用standard encryption 代替. 
+(if so, will look into plain docx content to determine if it is
+for office 2007 or office 2010 above. plain docx is in ZIP format.)
+
+
+d20130304
+可以生成Agile EncryptionInfo字节流，下一步生成 encrypted package并且按OLE格式拼接成文件。
+
+
+d20130306
+已完成Agile data encryption, 还需自动生成EncryptionInfo header for password verification & integrity check.
+
+
+d20130307
+该版本已完整支持Agile password verification, data encryption/decryption, and data integrity check.该版本还未去除参考他人的OfficeAgileLib模块。
+
+如果是DOCX etc文件， 加密时缺省使用Office Standard encryption.
+
+
+d20130314
+去除Lyquidity OLE dll文件，因为它也是基于Microsoft OLE32.dll的P-Invoke方式。 准备自己的OLE包。暂时保留NPOI dll.
+借鉴excel2file中的OLE实现(EncryptedPackageHandler.cs)，还有www.pinvoke.net。
+
+
+OLEStorageWrapper 构造函数能处理文件名输入，但处理bytes input还有问题！
+OLE error: STG_E_FILEALREADYEXISTS (0x80030050)
+
+
+d20130423
+OLEStorageWrapper 构造函数现在能accept storage bytes as input
+下一步：实现OLE writeStream, SaveAs， 并研究excel2file加密
+
+d20130424
+已实现OLE WriteStream, SaveAs, GetAllBytes。 注意SaveAs & GetAllBytes 仅适用于基于ILockBytes创建的IStorage,比如 new OleStorageWrapper(). 继续研究excel2file加密及附加stream信息
+
+d20130425
+XLSX,XLSB,PPTX,DOCX加密文件已包含附属dataspaces信息， 注意DOCX for Office 2007 TransformInfo末尾稍有不同，但无大碍。另excel2file中包含对sheet protection password hash的生成算法 (不是打开密码).
+
+***下一步工作：实现 doc, xls, ppt形式的 文件加密和解密
+
+d20130503
+完善OleStorageWrapper独立包，支持文件或字节流读入，stream write,并显式输出到文件或字节流.
+显示破解密码需要时间，速度，百分比等信息。
+CrackOffice.exe crack password.doc passw**d
+passwoqd        41.74%  pps=8825        elapse=63ms     remain=88ms
+Password=password
+
+d20131121
+* 对Office文件打开存在权限拒绝bug。 已解决，不是bug。原来是我设置文件为只读。现在改为可写，然后写入字节，最后恢复文件只读属性
+* CryptLib提示 "An symmetric key algorithm of AES could not be created." 是net4.0=>3.5不支持SymmetricAlgorithm.Create(string).已解决。
